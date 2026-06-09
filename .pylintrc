@@ -1,0 +1,5 @@
+[MASTER]
+extension-pkg-whitelist=PySide6
+
+[MESSAGES CONTROL]
+disable=E1101,C0114,C0115,C0116,C0304,C2401

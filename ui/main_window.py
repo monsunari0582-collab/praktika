@@ -15,7 +15,7 @@ from ui.teacher_subject_tab import TeacherSubjectTab
 from ui.teacher_class_tab import TeacherClassTab
 from ui.constraints_tab import ConstraintsTab
 from ui.schedule_tab import ScheduleTab
-from algorithm.scheduler import generate_schedule
+from algorithm.scheduler import generate_schedule, generate_schedule_no_teachers
 
 
 class MainWindow(QMainWindow):
@@ -79,6 +79,13 @@ class MainWindow(QMainWindow):
         generate_btn.setCursor(Qt.PointingHandCursor)
         generate_btn.clicked.connect(self.generate)
         sidebar_layout.addWidget(generate_btn)
+
+        generate_no_teachers_btn = QPushButton("Без учителей")
+        generate_no_teachers_btn.setObjectName("generate_btn")
+        generate_no_teachers_btn.setFixedHeight(44)
+        generate_no_teachers_btn.setCursor(Qt.PointingHandCursor)
+        generate_no_teachers_btn.clicked.connect(self.generate_no_teachers)
+        sidebar_layout.addWidget(generate_no_teachers_btn)
 
         # Правая часть
         right_widget = QWidget()
@@ -206,4 +213,14 @@ class MainWindow(QMainWindow):
             self,
             "Готово",
             f"Расписание составлено!\nУроков добавлено: {добавлено}\nНе удалось поставить: {пропущено}"
+        )
+
+    def generate_no_teachers(self):
+        добавлено, пропущено = generate_schedule_no_teachers()
+        self.schedule_tab.load_schedule()
+        self.switch_page(3)
+        QMessageBox.information(
+            self,
+            "Готово",
+            f"Расписание (без учителей) составлено!\nУроков добавлено: {добавлено}\nНе удалось поставить: {пропущено}"
         )

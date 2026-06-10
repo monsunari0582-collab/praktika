@@ -35,7 +35,7 @@ def init_database():
         CREATE TABLE IF NOT EXISTS УЧИТЕЛЬ_КЛАСС (
             учитель_ид  INTEGER,
             класс_ид    INTEGER,
-            PRIMARY KEY (учитель_ид, класс_ид),
+            PRIMARY KEY (учитель_ид, класс_ид), 
             FOREIGN KEY (учитель_ид) REFERENCES УЧИТЕЛЬ(ид),
             FOREIGN KEY (класс_ид)   REFERENCES КЛАСС(ид)
         );

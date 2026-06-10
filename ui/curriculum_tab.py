@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QTableWidget,
+    QPushButton, QTableWidget, QTabWidget,
     QTableWidgetItem, QLabel, QMessageBox,
     QComboBox, QSpinBox, QDialog, QDialogButtonBox
 )
@@ -63,21 +63,15 @@ class CurriculumTab(QWidget):
         form_layout.addWidget(self.hours_input)
         form_layout.addWidget(add_btn)
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Класс", "Предмет", "Часов в неделю"])
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionMode(QTableWidget.MultiSelection)
+        self.class_tabs = QTabWidget()
 
         bottom_layout = QHBoxLayout()
 
         select_all_btn = QPushButton("Выбрать все")
-        select_all_btn.clicked.connect(self.table.selectAll)
+        select_all_btn.clicked.connect(self.select_all_current)
 
         deselect_btn = QPushButton("Снять выбор")
-        deselect_btn.clicked.connect(self.table.clearSelection)
+        deselect_btn.clicked.connect(self.deselect_current)
 
         edit_btn = QPushButton("Редактировать")
         edit_btn.clicked.connect(self.edit_plan)
@@ -91,7 +85,7 @@ class CurriculumTab(QWidget):
         bottom_layout.addWidget(delete_btn)
 
         layout.addLayout(form_layout)
-        layout.addWidget(self.table)
+        layout.addWidget(self.class_tabs)
         layout.addLayout(bottom_layout)
 
         self.setLayout(layout)
@@ -114,30 +108,65 @@ class CurriculumTab(QWidget):
 
         conn.close()
 
+    def current_table(self):
+        return self.class_tabs.currentWidget()
+
+    def select_all_current(self):
+        t = self.current_table()
+        if t:
+            t.selectAll()
+
+    def deselect_current(self):
+        t = self.current_table()
+        if t:
+            t.clearSelection()
+
     def load_table(self):
+        current_index = self.class_tabs.currentIndex()
+
+        self.class_tabs.clear()
+
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT К.параллель, К.буква, П.название,
-                   УП.часов_в_неделю, УП.класс_ид, УП.предмет_ид
-            FROM УЧЕБНЫЙ_ПЛАН УП
-            JOIN КЛАСС К ON УП.класс_ид = К.ид
-            JOIN ПРЕДМЕТ П ON УП.предмет_ид = П.ид
-            ORDER BY CAST(К.параллель AS INTEGER), К.буква, П.название
-        """)
-        rows = cursor.fetchall()
+        cursor.execute("SELECT ид, параллель, буква FROM КЛАСС ORDER BY CAST(параллель AS INTEGER), буква")
+        классы = cursor.fetchall()
+
+        for класс in классы:
+            класс_ид = класс["ид"]
+            название = f"{класс['параллель']}{класс['буква']}"
+
+            table = QTableWidget()
+            table.setColumnCount(2)
+            table.setHorizontalHeaderLabels(["Предмет", "Часов в неделю"])
+            table.horizontalHeader().setStretchLastSection(True)
+            table.setSelectionBehavior(QTableWidget.SelectRows)
+            table.setEditTriggers(QTableWidget.NoEditTriggers)
+            table.setSelectionMode(QTableWidget.MultiSelection)
+            table.verticalHeader().setVisible(False)
+
+            cursor.execute("""
+                SELECT П.название, УП.часов_в_неделю, УП.предмет_ид
+                FROM УЧЕБНЫЙ_ПЛАН УП
+                JOIN ПРЕДМЕТ П ON УП.предмет_ид = П.ид
+                WHERE УП.класс_ид = ?
+                ORDER BY П.название
+            """, (класс_ид,))
+            rows = cursor.fetchall()
+
+            for row in rows:
+                r = table.rowCount()
+                table.insertRow(r)
+                table.setItem(r, 0, QTableWidgetItem(row["название"]))
+                table.setItem(r, 1, QTableWidgetItem(str(row["часов_в_неделю"])))
+                table.item(r, 0).setData(256, класс_ид)
+                table.item(r, 1).setData(256, row["предмет_ид"])
+
+            self.class_tabs.addTab(table, название)
+
         conn.close()
 
-        self.table.setRowCount(0)
-        for row in rows:
-            r = self.table.rowCount()
-            self.table.insertRow(r)
-            название = f"{row['параллель']}{row['буква']}"
-            self.table.setItem(r, 0, QTableWidgetItem(название))
-            self.table.setItem(r, 1, QTableWidgetItem(row["название"]))
-            self.table.setItem(r, 2, QTableWidgetItem(str(row["часов_в_неделю"])))
-            self.table.item(r, 0).setData(256, row["класс_ид"])
-            self.table.item(r, 1).setData(256, row["предмет_ид"])
+        if 0 <= current_index < self.class_tabs.count():
+            self.class_tabs.setCurrentIndex(current_index)
 
     def add_plan(self):
         класс_ид = self.class_combo.currentData()
@@ -169,15 +198,15 @@ class CurriculumTab(QWidget):
         self.load_table()
 
     def edit_plan(self):
-        selected = self.table.selectedItems()
-        if not selected:
+        table = self.current_table()
+        if not table or not table.selectedItems():
             QMessageBox.warning(self, "Ошибка", "Выберите строку")
             return
 
-        row = self.table.currentRow()
-        класс_ид = self.table.item(row, 0).data(256)
-        предмет_ид = self.table.item(row, 1).data(256)
-        часов = int(self.table.item(row, 2).text())
+        row = table.currentRow()
+        класс_ид = table.item(row, 0).data(256)
+        предмет_ид = table.item(row, 1).data(256)
+        часов = int(table.item(row, 1).text())  # текст колонки "Часов в неделю"
 
         dialog = EditCurriculumDialog(часов, self)
         if dialog.exec() == QDialog.Accepted:
@@ -193,7 +222,11 @@ class CurriculumTab(QWidget):
             self.load_table()
 
     def delete_selected(self):
-        выбранные_строки = set(item.row() for item in self.table.selectedItems())
+        table = self.current_table()
+        if not table:
+            return
+
+        выбранные_строки = set(item.row() for item in table.selectedItems())
         if not выбранные_строки:
             QMessageBox.warning(self, "Ошибка", "Выберите строки")
             return
@@ -209,8 +242,8 @@ class CurriculumTab(QWidget):
         conn = get_connection()
         cursor = conn.cursor()
         for строка in выбранные_строки:
-            класс_ид = self.table.item(строка, 0).data(256)
-            предмет_ид = self.table.item(строка, 1).data(256)
+            класс_ид = table.item(строка, 0).data(256)
+            предмет_ид = table.item(строка, 1).data(256)
             cursor.execute("""
                 DELETE FROM УЧЕБНЫЙ_ПЛАН WHERE класс_ид = ? AND предмет_ид = ?
             """, (класс_ид, предмет_ид))

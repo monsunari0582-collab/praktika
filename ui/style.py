@@ -87,7 +87,7 @@ STYLE = """
     }
 
     QTableWidget::item {
-        padding: 8px;
+        padding: 6px 8px 10px 8px;
         border-bottom: 1px solid #f0f3f6;
     }
 

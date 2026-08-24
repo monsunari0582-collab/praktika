@@ -13,9 +13,10 @@ def init_database():
         );
 
         CREATE TABLE IF NOT EXISTS ПРЕДМЕТ (
-            ид       INTEGER PRIMARY KEY AUTOINCREMENT,
-            название TEXT NOT NULL,
-            код      TEXT UNIQUE
+            ид            INTEGER PRIMARY KEY AUTOINCREMENT,
+            название      TEXT NOT NULL,
+            код           TEXT UNIQUE,
+            краткое_имя   TEXT
         );
 
         CREATE TABLE IF NOT EXISTS УЧИТЕЛЬ (

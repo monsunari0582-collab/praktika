@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (
+    QHeaderView,
     QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QTableWidget,
     QTableWidgetItem, QLabel, QMessageBox,
@@ -61,10 +62,13 @@ class ClassesTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Класс", "Параллель"])
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.setColumnWidth(1, 150)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.MultiSelection)
+        self.table.verticalHeader().setDefaultSectionSize(36)
 
         bottom_layout = QHBoxLayout()
 
@@ -85,12 +89,32 @@ class ClassesTab(QWidget):
         bottom_layout.addWidget(edit_btn)
         bottom_layout.addWidget(delete_btn)
 
+        # Сохраняем ссылку на кнопку редактирования
+        self.edit_btn = edit_btn
+        
+        # Стили для отключенных кнопок
+        disabled_style = """
+            QPushButton:disabled {
+                background-color: #E0E0E0;
+                color: #999999;
+                border: 1px solid #CCCCCC;
+                opacity: 0.6;
+            }
+        """
+        edit_btn.setStyleSheet(disabled_style)
+
         layout.addLayout(form_layout)
         layout.addWidget(self.table)
         layout.addLayout(bottom_layout)
 
         self.setLayout(layout)
         self.load_classes()
+
+        # Подключаем сигнал выделения
+        self.table.itemSelectionChanged.connect(self.update_button_states)
+        
+        # Изначально кнопка отключена
+        self.update_button_states()
 
     def load_classes(self):
         conn = get_connection()
@@ -179,3 +203,8 @@ class ClassesTab(QWidget):
         conn.commit()
         conn.close()
         self.load_classes()
+
+    def update_button_states(self):
+        """Отключает кнопку редактирования если выбрано не 1 класс"""
+        количество_выбранных = len(set(item.row() for item in self.table.selectedItems()))
+        self.edit_btn.setEnabled(количество_выбранных == 1)

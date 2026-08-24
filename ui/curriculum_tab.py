@@ -2,8 +2,11 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QTabWidget,
     QTableWidgetItem, QLabel, QMessageBox,
-    QComboBox, QSpinBox, QDialog, QDialogButtonBox
+    QComboBox, QSpinBox, QDialog, QDialogButtonBox,
+    QHeaderView
 )
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import Qt
 from database.connection import get_connection
 
 
@@ -84,9 +87,38 @@ class CurriculumTab(QWidget):
         bottom_layout.addWidget(edit_btn)
         bottom_layout.addWidget(delete_btn)
 
+        # Сохраняем ссылку на кнопку редактирования
+        self.edit_btn = edit_btn
+        
+        # Стили для отключенных кнопок
+        disabled_style = """
+            QPushButton:disabled {
+                background-color: #E0E0E0;
+                color: #999999;
+                border: 1px solid #CCCCCC;
+                opacity: 0.6;
+            }
+        """
+        edit_btn.setStyleSheet(disabled_style)
+
+        # Label с итого часов
+        self.total_hours_label = QLabel("ИТОГО ЧАСОВ: 0")
+        self.total_hours_label.setStyleSheet("""
+            QLabel {
+                background-color: #E8F0FE;
+                color: #2979B8;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 8px 12px;
+                border-radius: 4px;
+                border: 1px solid #BFD4E8;
+            }
+        """)
+
         layout.addLayout(form_layout)
         layout.addWidget(self.class_tabs)
         layout.addLayout(bottom_layout)
+        layout.addWidget(self.total_hours_label)
 
         self.setLayout(layout)
         self.load_table()
@@ -138,11 +170,15 @@ class CurriculumTab(QWidget):
             table = QTableWidget()
             table.setColumnCount(2)
             table.setHorizontalHeaderLabels(["Предмет", "Часов в неделю"])
-            table.horizontalHeader().setStretchLastSection(True)
+            table.horizontalHeader().setStretchLastSection(False)
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            table.setColumnWidth(1, 300)
             table.setSelectionBehavior(QTableWidget.SelectRows)
             table.setEditTriggers(QTableWidget.NoEditTriggers)
             table.setSelectionMode(QTableWidget.MultiSelection)
-            table.verticalHeader().setVisible(False)
+            table.verticalHeader().setVisible(True)
+            table.verticalHeader().setDefaultSectionSize(36)
+            table.verticalHeader().setFixedWidth(40)
 
             cursor.execute("""
                 SELECT П.название, УП.часов_в_неделю, УП.предмет_ид
@@ -153,6 +189,7 @@ class CurriculumTab(QWidget):
             """, (класс_ид,))
             rows = cursor.fetchall()
 
+            # Добавляем все предметы
             for row in rows:
                 r = table.rowCount()
                 table.insertRow(r)
@@ -162,11 +199,21 @@ class CurriculumTab(QWidget):
                 table.item(r, 1).setData(256, row["предмет_ид"])
 
             self.class_tabs.addTab(table, название)
+            
+            # Подключаем сигнал выделения для каждой таблицы
+            table.itemSelectionChanged.connect(self.update_button_states)
 
         conn.close()
 
         if 0 <= current_index < self.class_tabs.count():
             self.class_tabs.setCurrentIndex(current_index)
+
+        # Обновляем label с итого часов
+        self.class_tabs.currentChanged.connect(self.update_total_hours)
+        self.update_total_hours()
+        
+        # Изначально кнопка отключена
+        self.update_button_states()
 
     def add_plan(self):
         класс_ид = self.class_combo.currentData()
@@ -196,6 +243,7 @@ class CurriculumTab(QWidget):
         conn.commit()
         conn.close()
         self.load_table()
+        self.update_total_hours()
 
     def edit_plan(self):
         table = self.current_table()
@@ -204,6 +252,7 @@ class CurriculumTab(QWidget):
             return
 
         row = table.currentRow()
+        
         класс_ид = table.item(row, 0).data(256)
         предмет_ид = table.item(row, 1).data(256)
         часов = int(table.item(row, 1).text())  # текст колонки "Часов в неделю"
@@ -220,6 +269,7 @@ class CurriculumTab(QWidget):
             conn.commit()
             conn.close()
             self.load_table()
+            self.update_total_hours()
 
     def delete_selected(self):
         table = self.current_table()
@@ -250,3 +300,31 @@ class CurriculumTab(QWidget):
         conn.commit()
         conn.close()
         self.load_table()
+        self.update_total_hours()
+
+    def update_total_hours(self):
+        """Обновляет label с общим количеством часов в текущем классе"""
+        table = self.current_table()
+        if not table:
+            self.total_hours_label.setText("ИТОГО ЧАСОВ: 0")
+            return
+
+        total_hours = 0
+        for row in range(table.rowCount()):
+            try:
+                часов = int(table.item(row, 1).text())
+                total_hours += часов
+            except (ValueError, TypeError):
+                pass
+
+        self.total_hours_label.setText(f"ИТОГО ЧАСОВ: {total_hours}")
+
+    def update_button_states(self):
+        """Отключает кнопку редактирования если выбрано не 1 предмет"""
+        table = self.current_table()
+        if not table:
+            self.edit_btn.setEnabled(False)
+            return
+
+        количество_выбранных = len(set(item.row() for item in table.selectedItems()))
+        self.edit_btn.setEnabled(количество_выбранных == 1)

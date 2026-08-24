@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (
+    QHeaderView,
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget,
     QTableWidgetItem, QLabel, QMessageBox,
@@ -31,10 +32,13 @@ class TeacherClassTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Учитель", "Класс"])
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.setColumnWidth(1, 150)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.MultiSelection)
+        self.table.verticalHeader().setDefaultSectionSize(36)
 
         bottom_layout = QHBoxLayout()
 

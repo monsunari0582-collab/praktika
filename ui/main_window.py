@@ -12,18 +12,32 @@ from ui.subjects_tab import SubjectsTab
 from ui.curriculum_tab import CurriculumTab
 from ui.teachers_tab import TeachersTab
 from ui.teacher_subject_tab import TeacherSubjectTab
-from ui.teacher_class_tab import TeacherClassTab
+from ui.teacher_subject_class_tab import TeacherSubjectClassTab
+from ui.subject_load_tab import SubjectLoadTab
 from ui.constraints_tab import ConstraintsTab
 from ui.schedule_tab import ScheduleTab
+from ui.conflicts_tab import ConflictsTab
+from ui.plan_coverage_tab import PlanCoverageTab
 from algorithm.scheduler import generate_schedule
 
+
+import os
+import sys
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Расписание школы")
         self.setMinimumSize(1300, 800)
-        self.setWindowIcon(QIcon("icon.ico"))
+
+        icon_path = "icon.ico"
+        if getattr(sys, 'frozen', False):
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass and os.path.exists(os.path.join(meipass, "icon.ico")):
+                icon_path = os.path.join(meipass, "icon.ico")
+            elif os.path.exists(os.path.join(os.path.dirname(sys.executable), "icon.ico")):
+                icon_path = os.path.join(os.path.dirname(sys.executable), "icon.ico")
+        self.setWindowIcon(QIcon(icon_path))
 
         central = QWidget()
         main_layout = QHBoxLayout()
@@ -61,6 +75,7 @@ class MainWindow(QMainWindow):
             ("Учителя", 1),
             ("Ограничения", 2),
             ("Расписание", 3),
+            ("Проверка", 4),
         ]
 
         for text, index in nav_items:
@@ -118,10 +133,12 @@ class MainWindow(QMainWindow):
         teachers_inner = QTabWidget()
         self.teachers_tab = TeachersTab()
         self.teacher_subject_tab = TeacherSubjectTab()
-        self.teacher_class_tab = TeacherClassTab()
+        self.teacher_subject_class_tab = TeacherSubjectClassTab()
+        self.subject_load_tab = SubjectLoadTab()
         teachers_inner.addTab(self.teachers_tab, "Учителя")
         teachers_inner.addTab(self.teacher_subject_tab, "Предметы учителя")
-        teachers_inner.addTab(self.teacher_class_tab, "Классы учителя")
+        teachers_inner.addTab(self.teacher_subject_class_tab, "Распределение предметов")
+        teachers_inner.addTab(self.subject_load_tab, "Нагрузка по предметам")
         teachers_inner.currentChanged.connect(self.on_teachers_inner_changed)
         teachers_page_layout.addWidget(teachers_inner)
         teachers_page.setLayout(teachers_page_layout)
@@ -148,10 +165,27 @@ class MainWindow(QMainWindow):
         schedule_page_layout.addWidget(self.schedule_tab)
         schedule_page.setLayout(schedule_page_layout)
 
+        # Страница Проверка
+        check_page = QWidget()
+        check_page_layout = QVBoxLayout()
+        check_page_layout.setContentsMargins(24, 20, 24, 20)
+        check_title = QLabel("Проверка")
+        check_title.setObjectName("page_title")
+        check_page_layout.addWidget(check_title)
+        self.check_inner = QTabWidget()
+        self.plan_coverage_tab = PlanCoverageTab()
+        self.conflicts_tab = ConflictsTab()
+        self.check_inner.addTab(self.plan_coverage_tab, "Заполненность плана")
+        self.check_inner.addTab(self.conflicts_tab, "Накладки")
+        self.check_inner.currentChanged.connect(self.on_check_inner_changed)
+        check_page_layout.addWidget(self.check_inner)
+        check_page.setLayout(check_page_layout)
+
         self.stack.addWidget(classes_page)
         self.stack.addWidget(teachers_page)
         self.stack.addWidget(constraints_page)
         self.stack.addWidget(schedule_page)
+        self.stack.addWidget(check_page)
 
         right_layout.addWidget(self.stack)
 
@@ -175,6 +209,14 @@ class MainWindow(QMainWindow):
             self.constraints_tab.load_table()
         elif index == 3:
             self.schedule_tab.load_schedule()
+        elif index == 4:
+            self.on_check_inner_changed(self.check_inner.currentIndex())
+
+    def on_check_inner_changed(self, index):
+        if index == 0:
+            self.plan_coverage_tab.load_coverage()
+        else:
+            self.conflicts_tab.load_conflicts()
 
     def on_classes_inner_changed(self, index):
         tabs = [self.classes_tab, self.subjects_tab, self.curriculum_tab]
@@ -189,7 +231,7 @@ class MainWindow(QMainWindow):
             current.load_table()
 
     def on_teachers_inner_changed(self, index):
-        tabs = [self.teachers_tab, self.teacher_subject_tab, self.teacher_class_tab]
+        tabs = [self.teachers_tab, self.teacher_subject_tab, self.teacher_subject_class_tab, self.subject_load_tab]
         current = tabs[index]
         if hasattr(current, 'load_teachers'):
             current.load_teachers()

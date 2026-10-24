@@ -226,3 +226,10 @@ def fill_school_data():
     conn.commit()
     conn.close()
     print("Данные школы добавлены!")
+
+
+if __name__ == "__main__":
+    # Запуск из корня проекта: python -m database.fill_school_data
+    from database.init_db import init_database
+    init_database()
+    fill_school_data()

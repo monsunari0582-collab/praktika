@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox
 )
 from database.connection import get_connection
+from ui.table_actions import ActionBar, selected_rows
 
 
 class TeacherSubjectTab(QWidget):
@@ -37,27 +38,14 @@ class TeacherSubjectTab(QWidget):
         self.table.setColumnWidth(1, 150)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionMode(QTableWidget.MultiSelection)
         self.table.verticalHeader().setDefaultSectionSize(36)
 
-        bottom_layout = QHBoxLayout()
-
-        select_all_btn = QPushButton("Выбрать все")
-        select_all_btn.clicked.connect(self.table.selectAll)
-
-        deselect_btn = QPushButton("Снять выбор")
-        deselect_btn.clicked.connect(self.table.clearSelection)
-
-        delete_btn = QPushButton("Удалить выбранные")
-        delete_btn.clicked.connect(self.delete_selected)
-
-        bottom_layout.addWidget(select_all_btn)
-        bottom_layout.addWidget(deselect_btn)
-        bottom_layout.addWidget(delete_btn)
+        self.actions_bar = ActionBar(lambda: self.table, self.delete_selected)
+        self.actions_bar.attach(self.table)
 
         layout.addLayout(form_layout)
+        layout.addWidget(self.actions_bar)
         layout.addWidget(self.table)
-        layout.addLayout(bottom_layout)
 
         self.setLayout(layout)
         self.load_table()
@@ -128,7 +116,7 @@ class TeacherSubjectTab(QWidget):
         self.load_table()
 
     def delete_selected(self):
-        выбранные_строки = set(item.row() for item in self.table.selectedItems())
+        выбранные_строки = selected_rows(self.table)
         if not выбранные_строки:
             QMessageBox.warning(self, "Ошибка", "Выберите строки")
             return

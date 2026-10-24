@@ -86,9 +86,10 @@ STYLE = """
         outline: none;
     }
 
+    /* Без border: с ним Qt перестаёт рисовать цвет фона ячеек (setBackground).
+       Линии между строками и так рисует сетка (gridline-color). */
     QTableWidget::item {
         padding: 6px 8px 10px 8px;
-        border-bottom: 1px solid #f0f3f6;
     }
 
     QTableWidget::item:selected {
@@ -205,6 +206,13 @@ STYLE = """
 
     #btn_danger:hover {
         background-color: #ffe0e0;
+    }
+
+    /* Неактивные кнопки */
+    QPushButton:disabled, #btn_secondary:disabled, #btn_danger:disabled {
+        background-color: #eef1f4;
+        color: #a9b3bd;
+        border: 1px solid #e3e7eb;
     }
 
     /* Вкладки внутри страниц */

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor
 from database.connection import get_connection
+from ui.table_actions import ActionBar, selected_rows
 
 
 class EditSubjectDialog(QDialog):
@@ -67,54 +68,20 @@ class SubjectsTab(QWidget):
         self.table.setColumnWidth(1, 150)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionMode(QTableWidget.MultiSelection)
         self.table.verticalHeader().setDefaultSectionSize(36)
 
-        bottom_layout = QHBoxLayout()
-
-        select_all_btn = QPushButton("Выбрать все")
-        select_all_btn.clicked.connect(self.table.selectAll)
-
-        deselect_btn = QPushButton("Снять выбор")
-        deselect_btn.clicked.connect(self.table.clearSelection)
-
-        edit_btn = QPushButton("Редактировать")
-        edit_btn.clicked.connect(self.edit_subject)
-
-        delete_btn = QPushButton("Удалить выбранные")
-        delete_btn.clicked.connect(self.delete_selected)
-
-        bottom_layout.addWidget(select_all_btn)
-        bottom_layout.addWidget(deselect_btn)
-        bottom_layout.addWidget(edit_btn)
-        bottom_layout.addWidget(delete_btn)
-
-        # Сохраняем ссылку на кнопку редактирования
-        self.edit_btn = edit_btn
-        
-        # Стили для отключенных кнопок
-        disabled_style = """
-            QPushButton:disabled {
-                background-color: #E0E0E0;
-                color: #999999;
-                border: 1px solid #CCCCCC;
-                opacity: 0.6;
-            }
-        """
-        edit_btn.setStyleSheet(disabled_style)
+        self.actions_bar = ActionBar(
+            lambda: self.table, self.delete_selected,
+            [("Редактировать", self.edit_subject)]
+        )
+        self.actions_bar.attach(self.table)
 
         layout.addLayout(form_layout)
+        layout.addWidget(self.actions_bar)
         layout.addWidget(self.table)
-        layout.addLayout(bottom_layout)
 
         self.setLayout(layout)
         self.load_subjects()
-
-        # Подключаем сигнал выделения
-        self.table.itemSelectionChanged.connect(self.update_button_states)
-        
-        # Изначально кнопка отключена
-        self.update_button_states()
 
     def load_subjects(self):
         conn = get_connection()
@@ -211,13 +178,8 @@ class SubjectsTab(QWidget):
             conn.close()
             self.load_subjects()
 
-    def update_button_states(self):
-        """Отключает кнопку редактирования если выбрано не 1 предмет"""
-        количество_выбранных = len(set(item.row() for item in self.table.selectedItems()))
-        self.edit_btn.setEnabled(количество_выбранных == 1)
-
     def delete_selected(self):
-        выбранные_строки = set(item.row() for item in self.table.selectedItems())
+        выбранные_строки = selected_rows(self.table)
         if not выбранные_строки:
             QMessageBox.warning(self, "Ошибка", "Выберите предметы")
             return

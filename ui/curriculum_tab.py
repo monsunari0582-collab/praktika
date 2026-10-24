@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtCore import Qt
 from database.connection import get_connection
+from ui.table_actions import ActionBar, selected_rows
 
 
 class EditCurriculumDialog(QDialog):
@@ -68,38 +69,12 @@ class CurriculumTab(QWidget):
 
         self.class_tabs = QTabWidget()
 
-        bottom_layout = QHBoxLayout()
-
-        select_all_btn = QPushButton("Выбрать все")
-        select_all_btn.clicked.connect(self.select_all_current)
-
-        deselect_btn = QPushButton("Снять выбор")
-        deselect_btn.clicked.connect(self.deselect_current)
-
-        edit_btn = QPushButton("Редактировать")
-        edit_btn.clicked.connect(self.edit_plan)
-
-        delete_btn = QPushButton("Удалить выбранные")
-        delete_btn.clicked.connect(self.delete_selected)
-
-        bottom_layout.addWidget(select_all_btn)
-        bottom_layout.addWidget(deselect_btn)
-        bottom_layout.addWidget(edit_btn)
-        bottom_layout.addWidget(delete_btn)
-
-        # Сохраняем ссылку на кнопку редактирования
-        self.edit_btn = edit_btn
-        
-        # Стили для отключенных кнопок
-        disabled_style = """
-            QPushButton:disabled {
-                background-color: #E0E0E0;
-                color: #999999;
-                border: 1px solid #CCCCCC;
-                opacity: 0.6;
-            }
-        """
-        edit_btn.setStyleSheet(disabled_style)
+        self.actions_bar = ActionBar(
+            self.current_table, self.delete_selected,
+            [("Редактировать", self.edit_plan)]
+        )
+        self.class_tabs.currentChanged.connect(self.update_total_hours)
+        self.class_tabs.currentChanged.connect(self.actions_bar.update_state)
 
         # Label с итого часов
         self.total_hours_label = QLabel("ИТОГО ЧАСОВ: 0")
@@ -116,8 +91,8 @@ class CurriculumTab(QWidget):
         """)
 
         layout.addLayout(form_layout)
+        layout.addWidget(self.actions_bar)
         layout.addWidget(self.class_tabs)
-        layout.addLayout(bottom_layout)
         layout.addWidget(self.total_hours_label)
 
         self.setLayout(layout)
@@ -143,16 +118,6 @@ class CurriculumTab(QWidget):
     def current_table(self):
         return self.class_tabs.currentWidget()
 
-    def select_all_current(self):
-        t = self.current_table()
-        if t:
-            t.selectAll()
-
-    def deselect_current(self):
-        t = self.current_table()
-        if t:
-            t.clearSelection()
-
     def load_table(self):
         current_index = self.class_tabs.currentIndex()
 
@@ -175,7 +140,6 @@ class CurriculumTab(QWidget):
             table.setColumnWidth(1, 300)
             table.setSelectionBehavior(QTableWidget.SelectRows)
             table.setEditTriggers(QTableWidget.NoEditTriggers)
-            table.setSelectionMode(QTableWidget.MultiSelection)
             table.verticalHeader().setVisible(True)
             table.verticalHeader().setDefaultSectionSize(36)
             table.verticalHeader().setFixedWidth(40)
@@ -199,21 +163,15 @@ class CurriculumTab(QWidget):
                 table.item(r, 1).setData(256, row["предмет_ид"])
 
             self.class_tabs.addTab(table, название)
-            
-            # Подключаем сигнал выделения для каждой таблицы
-            table.itemSelectionChanged.connect(self.update_button_states)
+            self.actions_bar.attach(table)
 
         conn.close()
 
         if 0 <= current_index < self.class_tabs.count():
             self.class_tabs.setCurrentIndex(current_index)
 
-        # Обновляем label с итого часов
-        self.class_tabs.currentChanged.connect(self.update_total_hours)
         self.update_total_hours()
-        
-        # Изначально кнопка отключена
-        self.update_button_states()
+        self.actions_bar.update_state()
 
     def add_plan(self):
         класс_ид = self.class_combo.currentData()
@@ -276,7 +234,7 @@ class CurriculumTab(QWidget):
         if not table:
             return
 
-        выбранные_строки = set(item.row() for item in table.selectedItems())
+        выбранные_строки = selected_rows(table)
         if not выбранные_строки:
             QMessageBox.warning(self, "Ошибка", "Выберите строки")
             return
@@ -318,13 +276,3 @@ class CurriculumTab(QWidget):
                 pass
 
         self.total_hours_label.setText(f"ИТОГО ЧАСОВ: {total_hours}")
-
-    def update_button_states(self):
-        """Отключает кнопку редактирования если выбрано не 1 предмет"""
-        table = self.current_table()
-        if not table:
-            self.edit_btn.setEnabled(False)
-            return
-
-        количество_выбранных = len(set(item.row() for item in table.selectedItems()))
-        self.edit_btn.setEnabled(количество_выбранных == 1)
